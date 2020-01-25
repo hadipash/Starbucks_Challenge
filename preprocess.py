@@ -76,7 +76,7 @@ def transform(profile, transcript, offers):
     return data
 
 
-def split_and_save(data, offers):
+def split_data(data, offers):
     # transform the gender column into separate columns ('Other' is the base case => no need a separate column)
     data = data.reindex(['F', 'M'] + list(data.columns.values), axis=1)
     data['F'] = data.apply(lambda x: 1 if x['gender'] == 'F' else 0, axis=1)
@@ -84,12 +84,10 @@ def split_and_save(data, offers):
     data = data.drop(columns=['id', 'gender', 'amount_spend'])
 
     # splitting data into training, validation and test sets
-    z = data.iloc[:, :-len(offers)]
-    zz = data.iloc[:, -len(offers):]
     X_train, X_test, y_train, y_test = train_test_split(data.iloc[:, :-len(offers)], data.iloc[:, -len(offers):],
                                                         test_size=0.2, random_state=42)
     X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train, test_size=0.2, random_state=42)
-    print('\nNumber of data points in train: {}, validation: {}, test: {}'.
+    print('Number of data points in train: {}, validation: {}, test: {}'.
           format(len(X_train.index), len(X_valid.index), len(X_test.index)))
 
     # Min-Max Feature scaling for 'age' and 'income'
@@ -98,13 +96,18 @@ def split_and_save(data, offers):
         x['income'] = (x['income'] - X_train['income'].min()) / (X_train['income'].max() - X_train['income'].min())
 
     # Drop columns with unknown labels and save into files:
+    data = {}
     for offer in offers:
+        data.update({offer: {}})
         for key, _set in {'train': [X_train, y_train], 'valid': [X_valid, y_valid], 'test': [X_test, y_test]}.items():
             offer_y = _set[1][_set[1][offer] != 0][offer]
             offer_X = _set[0].loc[offer_y.index]
 
-            offer_X.to_pickle(os.path.join(data_dir, offer + '_X_' + key + '.pkl'))
-            offer_y.to_pickle(os.path.join(data_dir, offer + '_y_' + key + '.pkl'))
+            data[offer].update({key: {}})
+            data[offer][key]['X'] = offer_X
+            data[offer][key]['y'] = offer_y
+
+    return data
 
 
 def preprocess(portfolio, profile, transcript):
@@ -142,10 +145,12 @@ def preprocess(portfolio, profile, transcript):
     data = pd.DataFrame(data, columns=['id', 'gender', 'age', 'income', 'difficulty', 'reward', 'web', 'mobile',
                                        'social', 'bogo', 'disc', 'info', 'amount_spend'])
 
-    # apply grouping for easier data visualization
+    # save preprocessed data
+    data.to_pickle(os.path.join(data_dir, 'data.pkl'))
+
+    # apply grouping for easier data visualization and save
     data_brief = data.groupby(['id']).max().reset_index()
     data_brief.to_pickle(os.path.join(data_dir, 'data_brief.pkl'))
-    split_and_save(data, ['bogo', 'disc', 'info'])
 
 
 if __name__ == "__main__":
