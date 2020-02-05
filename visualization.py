@@ -10,8 +10,7 @@ def update_axes(fig, values):
     Sets titles for x and y axes on plotly graphs.
 
     :param fig: plotly.graph_objects.Figure. Contains graphs for which axes titles are required to be set.
-    :param values: dict. {'xtitle': x_title, 'ytitle': y_title, 'range': range of values for x axis,
-                          'row': graph's row #, 'col': graph's column #}
+    :param values: dict. {'xtitle': str, 'ytitle': str, 'range': list, 'row': int, 'col': int}
     """
     for val in values:
         # Update xaxis and yaxis properties
@@ -24,8 +23,8 @@ def count_positives(data, feature, offer, n_bins):
     Counts percentages of positive responses given by customers for each bin.
 
     :param data: DataFrame. The data with customers' information.
-    :param feature: string. Name of the feature to split into bins.
-    :param offer: string. Name of the offer for which to count percentages of positive responses.
+    :param feature: str. Name of the feature to split into bins.
+    :param offer: str. Name of the offer for which to count percentages of positive responses.
     :param n_bins: int. Number of bins to split into.
     :return: DataFrame. Contains percentage of positive responses for each bin.
     """
