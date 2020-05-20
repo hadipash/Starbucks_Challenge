@@ -1,3 +1,9 @@
+numpy
 pandas
 plotly
 scikit-learn
+notebook
+boto3
+sagemaker
+requests
+ipython

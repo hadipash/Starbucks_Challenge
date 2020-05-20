@@ -12,18 +12,18 @@ def parse_offers(offers, transactions, offer_name):
     """
     Extracts the responses to offers given by each customer
     
-    :param offers: dict. All offers of single type (bogo, or disc, or info)
+    :param offers: dict. All offers of a single type (bogo, or disc, or info)
     :param transactions: DataFrame. Transaction made by a customer
-    :param offer_name: str. Name of an offer type (bogo, or disc, or info)
+    :param offer_name: str. Name of the offer type (bogo, or disc, or info)
     :return: list of responses given by a customer to offers
     """
     data = []
 
     for _id, info in offers.items():
-        # get all the transactions associated with an offer
+        # get all the transactions associated with the offer (by id)
         history = transactions[(transactions['value'] == {'offer id': _id}) |
                                (transactions['value'] == {'offer_id': _id, 'reward': info['reward']})]
-        if not history.empty:  # if the offer received
+        if not history.empty:  # if the offer was received
             receive_time = history[history['event'] == 'offer received']['time'].values
             viewed = history[history['event'] == 'offer viewed']
             completed = history[history['event'] == 'offer completed']
@@ -45,6 +45,7 @@ def parse_offers(offers, transactions, offer_name):
                     # if only viewed during the influence period
                     else:
                         response = 2
+
             data.append({
                 'response': response,
                 'difficulty': info['difficulty'],
@@ -57,7 +58,7 @@ def parse_offers(offers, transactions, offer_name):
 
 def transform(profile, transcript, offers):
     """
-    Transforms given by Starbucks input files into one big table suitable for future data analysis.
+    Transforms given by Starbucks input files into one big table suitable for further data analysis.
     Particularly, the new table looks as follows:
     | id | gender | age | income | difficulty | reward | web | mobile | social | bogo | disc | info | amount_spend |
     |----|--------|-----|--------|------------|--------|-----|--------|--------|------|------|------|--------------|
@@ -73,6 +74,7 @@ def transform(profile, transcript, offers):
     # the table may contain rows with a person several times, each corresponds to a different response to an offer
     for index, person in profile.iterrows():
         transactions = transcript[transcript['person'] == person['id']]
+        # sum all the transactions made by a customer
         amount_spend = transactions[transactions['event'] == 'transaction']['value'].to_list()
         amount_spend = sum([amount['amount'] for amount in amount_spend])
 
@@ -96,16 +98,16 @@ def transform(profile, transcript, offers):
                 })
 
         if not (index + 1) % 1000:
-            print('Processed {:d} entries'.format(index + 1))
+            print(f'Processed {index + 1:d} entries')
 
     return data
 
 
 def preprocess(portfolio, profile, transcript, save_dir='data'):
     """
-    Preprocesses, cleans the input data and then transforms several input sets into one.
-    The output table is saved as pickle files in 2 forms: first is for feeding into algorithms (data.pkl) and
-    the other one (with no duplication by id) is for visualization (data_brief.pkl)
+    Preprocesses and cleans the input data, and then transforms several input sets into one.
+    The output table is saved as pickle files in 2 forms: first is for feeding into the algorithms (data.pkl) and
+    the other one (no duplication by id) is for visualization (data_brief.pkl)
 
     :param portfolio: DataFrame. portfolio.json converted to Pandas DataFrame
     :param profile: DataFrame. profile.json converted to Pandas DataFrame
@@ -113,8 +115,8 @@ def preprocess(portfolio, profile, transcript, save_dir='data'):
     :param save_dir: str. Output files saving location
     """
 
-    # read offers from the files and convert into a dictionary
-    # {'offer id':{'duration': int, 'reward': int, 'difficulty': int, 'channels': list}}
+    # read offers into dictionaries of the form:
+    # {'offer id': {'duration': int, 'reward': int, 'difficulty': int, 'channels': list}}
     bogo = portfolio[portfolio['offer_type'] ==
                      'bogo'][['id', 'duration', 'reward', 'difficulty', 'channels']]. \
                      set_index('id').to_dict(orient='index')
@@ -131,9 +133,7 @@ def preprocess(portfolio, profile, transcript, save_dir='data'):
                                    (profile['income'].isna())].index).reset_index(drop=True)
 
     # apply data transformation
-    data = transform(profile, transcript, {'bogo': bogo, 'disc': disc, 'info': info})
-    data = pd.DataFrame(data, columns=['id', 'gender', 'age', 'income', 'difficulty', 'reward', 'web', 'mobile',
-                                       'social', 'bogo', 'disc', 'info', 'amount_spend'])
+    data = pd.DataFrame(transform(profile, transcript, {'bogo': bogo, 'disc': disc, 'info': info}))
 
     # save preprocessed data
     data.to_pickle(os.path.join(save_dir, 'data.pkl'))
@@ -146,7 +146,7 @@ def preprocess(portfolio, profile, transcript, save_dir='data'):
     print('Saving data_brief.pkl')
 
 
-def split_data(data, offers, stratify=None, scaling=None):
+def split_data(data, offers, stratify=None, scaling=None, random_state=42):
     """
     Splits data into train, validation and test sets.
 
@@ -154,9 +154,10 @@ def split_data(data, offers, stratify=None, scaling=None):
     :param offers: list. Names of offer types
     :param stratify: list. Column names to be used for data split in stratified fashion
     :param scaling: list. Column names to apply Min-Max Scaling on
-    :return: dict. Features and labels for each set and offer type.
+    :param random_state: int. Random seed for scikit-learn's train_test_split function
+    :return: dict. Features and labels for each set
     """
-    # avoid Mutable Default Argument
+    # to avoid Mutable Default Argument
     if scaling is None:
         scaling = []
 
@@ -165,11 +166,11 @@ def split_data(data, offers, stratify=None, scaling=None):
 
     # splitting data into training, validation and test sets
     train_ids, test_ids = train_test_split(data_brief, stratify=data_brief[stratify] if stratify else None,
-                                           test_size=0.2, random_state=42)
+                                           test_size=0.2, random_state=random_state)
     train_ids, valid_ids = train_test_split(train_ids, stratify=train_ids[stratify] if stratify else None,
-                                            test_size=0.2, random_state=42)
+                                            test_size=0.2, random_state=random_state)
 
-    # transform the gender column into separate columns ('Other' is the base case => no need a separate column)
+    # split the gender column into separate columns ('Other' is the base case => no need a separate column)
     data = data.reindex(['F', 'M'] + list(data.columns.values), axis=1)
     data['F'] = data.apply(lambda x: 1 if x['gender'] == 'F' else 0, axis=1)
     data['M'] = data.apply(lambda x: 1 if x['gender'] == 'M' else 0, axis=1)
@@ -187,8 +188,8 @@ def split_data(data, offers, stratify=None, scaling=None):
     X_test = test.iloc[:, :-len(offers)].drop(columns=['id'])
     y_test = test.iloc[:, -len(offers):]
 
-    print('Number of data points in train: {}, validation: {}, test: {}'.
-          format(len(X_train.index), len(X_valid.index), len(X_test.index)))
+    print(f'Number of data points in train: {len(X_train.index)}, validation: {len(X_valid.index)}, '
+          f'test: {len(X_test.index)}')
 
     # Min-Max Feature scaling
     for feature in scaling:
@@ -196,6 +197,7 @@ def split_data(data, offers, stratify=None, scaling=None):
             x[feature] = (x[feature] - X_train[feature].min()) / (X_train[feature].max() - X_train[feature].min())
 
     # Drop rows with unknown labels (0) and prepare sets for convenient access:
+    # {'offer_type': {'train': {'X': X, 'y': y}, 'valid': {'X': X, 'y': y}, 'test': {'X': X, 'y': y}}}
     data = {}
     for offer in offers:
         data.update({offer: {}})
@@ -217,4 +219,4 @@ if __name__ == "__main__":
     transcript = pd.read_json(os.path.join('data', 'transcript.json'), orient='records', lines=True)
 
     preprocess(portfolio, profile, transcript)
-    print('Preprocessing time {:.2f} s'.format(time.time() - start))
+    print(f'Preprocessing time {(time.time() - start):.2f} s')

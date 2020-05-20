@@ -11,7 +11,7 @@ def lambda_handler(event, context):
     Sends received through API data for inference to the endpoints and returns back predictions
 
     :param event: dict. AWS Lambda uses this parameter to pass in event data to the handler
-    :param context: AWS Lambda uses this parameter to provide runtime information to your handler
+    :param context: AWS Lambda uses this parameter to provide runtime information to the handler
     :return: dict. server response with body containing model's predictions
     """
     endpoints = {

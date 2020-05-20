@@ -20,11 +20,11 @@ def update_axes(fig, values):
 
 def count_positives(data, feature, offer, n_bins):
     """
-    Counts percentages of positive responses given by customers for each bin.
+    Counts percentage of positive responses given by customers for each bin.
 
-    :param data: DataFrame. The data with customers' information.
+    :param data: DataFrame. Customers' information.
     :param feature: str. Name of the feature to split into bins.
-    :param offer: str. Name of the offer for which to count percentages of positive responses.
+    :param offer: str. Name of the offer for which to count percentage of positive responses.
     :param n_bins: int. Number of bins to split into.
     :return: DataFrame. Contains percentage of positive responses for each bin.
     """

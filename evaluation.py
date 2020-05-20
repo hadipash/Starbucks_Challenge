@@ -1,5 +1,5 @@
 """
-This is a modified version of evaluation code provided here:
+Models evaluation function. This is a modified version of evaluation code provided here:
 https://github.com/udacity/ML_SageMaker_Studies/blob/master/Payment_Fraud_Detection/Fraud_Detection_Solution.ipynb
 """
 
@@ -10,15 +10,15 @@ import pandas as pd
 def evaluate(offers, verbose=True, csv=False, jsonlines=False, beta=1):
     """
     Evaluate a model on a test set given the prediction endpoint or output files.
-    Return binary classification metrics.
+    Return binary classification metrics (recall, precision, accuracy, F-score).
 
     :param offers: list. List of dictionaries, each of which contains a prediction endpoint (or location of
-                   output files), test features and class labels for test data for different types of offers
+                   output files), test features and labels
     :param verbose: bool. If True, prints a table of all performance metrics
-    :param csv: bool. If a model's predictions are saved as csv-files
-    :param jsonlines: bool. If a model's predictions are saved as jsonlines-files
-    :param beta: float. Beta value for F-score metric (F1 is beta is 1)
-    :return: dict. of performance metrics.
+    :param csv: bool. If model's predictions are saved as csv-files
+    :param jsonlines: bool. If model's predictions are saved as jsonlines-files
+    :param beta: float. Beta value for F-score metric (F1 when beta is 1)
+    :return: dict. Model's performance metrics.
     """
     tp = fp = tn = fn = 0
     for offer in offers:
@@ -27,12 +27,11 @@ def evaluate(offers, verbose=True, csv=False, jsonlines=False, beta=1):
         elif jsonlines:
             test_preds = pd.read_json(offer['location'], orient='records', lines=True)
             test_preds = test_preds['predicted_label'].squeeze().values
-        else:
+        else:   # prediction endpoint
             # split the test data set into batches and evaluate using prediction endpoint
             prediction_batches = [offer['predictor'].predict(batch) for batch in np.array_split(offer['X'], 100)]
 
             # LinearLearner produces a `predicted_label` for each data point in a batch
-            # get the 'predicted_label' for every point in a batch
             test_preds = np.concatenate([np.array([x.label['predicted_label'].float32_tensor.values[0] for x in batch])
                                          for batch in prediction_batches])
 
@@ -53,13 +52,13 @@ def evaluate(offers, verbose=True, csv=False, jsonlines=False, beta=1):
     accuracy = (tp + tn) / (tp + fp + tn + fn)
     f_score = (1 + beta**2) * precision * recall / ((beta**2 * precision) + recall)
 
-    # printing a table of metrics
+    # print a table of metrics
     if verbose:
         print('Total:')
-        print("{:<11} {:.3f}".format('Recall:', recall))
-        print("{:<11} {:.3f}".format('Precision:', precision))
-        print("{:<11} {:.3f}".format('Accuracy:', accuracy))
-        print("{:<11} {:.3f}".format('F-score:', f_score))
+        print(f"{'Recall:':<11} {recall:.3f}")
+        print(f"{'Precision:':<11} {precision:.3f}")
+        print(f"{'Accuracy:':<11} {accuracy:.3f}")
+        print(f"{'F-score:':<11} {f_score:.3f}")
 
     return {'TP': tp, 'FP': fp, 'FN': fn, 'TN': tn,
             'Precision': precision, 'Recall': recall, 'Accuracy': accuracy, 'F-score': f_score}
